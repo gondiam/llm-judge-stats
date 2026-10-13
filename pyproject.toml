@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-judge-stats"
+version = "0.1.0"
+description = "Statistically rigorous evaluation of LLM judges: kappa, ICC, F1/MCC with bootstrap CIs, sample-size planning, position-bias shuffling."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+example = ["pandas", "pyarrow"]
+test = ["pytest"]
