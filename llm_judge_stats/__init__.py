@@ -1,6 +1,18 @@
 """Statistical tools for LLM evals: planning, comparing variants and checking judges."""
 
-from .agreement import cohen_kappa, f1, fleiss_kappa, icc, majority_vote, mcc, shuffled_judge
+from .agreement import (
+    JudgeAdjustedRate,
+    cohen_kappa,
+    f1,
+    fleiss_kappa,
+    icc,
+    judge_adjusted_rate,
+    krippendorff_alpha,
+    majority_vote,
+    mcc,
+    shuffled_judge,
+    spearman,
+)
 from .compare import Comparison, adjust_pvalues, compare, compare_many
 from .planning import (
     n_for_kappa,
@@ -19,6 +31,10 @@ __all__ = [
     "cohen_kappa",
     "fleiss_kappa",
     "icc",
+    "krippendorff_alpha",
+    "spearman",
+    "judge_adjusted_rate",
+    "JudgeAdjustedRate",
     "f1",
     "mcc",
     "bootstrap_ci",
