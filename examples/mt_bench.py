@@ -1,9 +1,10 @@
 """GPT-4-as-judge vs. human experts on MT-Bench (public dataset, CC-BY-4.0).
 
 Data: https://huggingface.co/datasets/lmsys/mt_bench_human_judgments
-Run:  pip install "llm-judge-stats[example]" && python examples/mt_bench.py
+Run:  uv run --extra example python examples/mt_bench.py
 """
 
+import numpy as np
 import pandas as pd
 
 from llm_judge_stats import (
@@ -11,6 +12,8 @@ from llm_judge_stats import (
     cohen_kappa,
     f1,
     fleiss_kappa,
+    judge_adjusted_rate,
+    krippendorff_alpha,
     majority_vote,
     mcc,
     n_for_kappa,
@@ -60,3 +63,22 @@ print(
     "items for binary kappa=0.6, prevalence=0.3, +-0.05 (planning formula):",
     n_for_kappa(0.6, 0.3, 0.05),
 )
+
+# Krippendorff's alpha uses every human vote, with missing ones where an item had fewer.
+votes = pairs[pairs.map(len) >= 2]
+width = votes.map(len).max()
+padded = [v + [None] * (width - len(v)) for v in votes]
+est, lo, hi = bootstrap_ci(krippendorff_alpha, padded, n_boot=500, seed=0)
+print(
+    f"Krippendorff's alpha human-human, all votes ({len(padded)} items, up to {width} raters): "
+    f"{est:.3f} [{lo:.3f}, {hi:.3f}]"
+)
+
+# How often does model_a win? Pretend humans labelled only half of the decisive items:
+# that half calibrates GPT-4, the other half is judged by GPT-4 alone. The human
+# rate on the second half is known here, so we can see whether the correction lands.
+half = np.random.default_rng(0).random(len(dec)) < 0.5
+r = judge_adjusted_rate(p[~half], p[half], y[half], seed=0)
+print("\nRate of 'model_a wins' on decisive items (here 'pass' = model_a wins):")
+print(r)
+print(f"human rate on the GPT-4-only half (the target): {y[~half].mean():.1%}")
