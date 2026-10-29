@@ -150,13 +150,18 @@ def _compare(
     if binary and paired:
         b_only, a_only = int(((x == 0) & (y == 1)).sum()), int(((x == 1) & (y == 0)).sum())
         disc = b_only + a_only
-        p = stats.binomtest(b_only, disc, 0.5).pvalue if disc else 1.0
+        # mid-p McNemar: exact McNemar is conservative (well under alpha at
+        # small n, so it misses the power planned by n_for_proportions); mid-p
+        # stays close to alpha (Fagerland, Lydersen & Laake 2013)
+        k = min(b_only, a_only)
+        mid = 2 * stats.binom.cdf(k, disc, 0.5) - stats.binom.pmf(k, disc, 0.5)
+        p = min(1.0, float(mid)) if disc else 1.0
         # Agresti & Min (2005): add 1/2 to each cell of the 2x2 table, then Wald
         nn, p10, p01 = n + 2, (b_only + 0.5) / (n + 2), (a_only + 0.5) / (n + 2)
         d_adj = p10 - p01
         half = z * math.sqrt((p10 + p01 - d_adj**2) / nn)
         ci = (d_adj - half, d_adj + half)
-        test, eff, ename, spread = "Exact McNemar test", _cohen_h(ma, mb), "Cohen's h", disc / n
+        test, eff, ename, spread = "Mid-p McNemar test", _cohen_h(ma, mb), "Cohen's h", disc / n
     elif binary:
         pooled = (x.sum() + y.sum()) / (n + m)
         se0 = math.sqrt(pooled * (1 - pooled) * (1 / n + 1 / m))
@@ -247,7 +252,7 @@ def compare(
     order, scored under both variants. Pairing removes item difficulty from the
     noise and usually cuts the items needed several-fold.
 
-    - 0/1 scores (pass/fail, auto-detected; override with `binary`): exact
+    - 0/1 scores (pass/fail, auto-detected; override with `binary`): mid-p
       McNemar test, Agresti-Min CI for the difference in pass rates, Cohen's h.
       Unpaired: two-proportion z test, Agresti-Caffo CI.
     - other scores: paired t test on per-item differences, Cohen's d_z.

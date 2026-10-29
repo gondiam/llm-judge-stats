@@ -13,13 +13,14 @@ def test_adjust_pvalues_by_hand():
         adjust_pvalues(p, "bonferroni")
 
 
-def test_paired_binary_is_exact_mcnemar():
+def test_paired_binary_is_mid_p_mcnemar():
     # 8 items only B passes, 2 only A passes, 30 agree
     a = np.array([0] * 8 + [1] * 2 + [1] * 20 + [0] * 10)
     b = np.array([1] * 8 + [0] * 2 + [1] * 20 + [0] * 10)
     c = compare(a, b)
     assert c.binary and c.paired and c.difference == pytest.approx(0.15)
-    assert c.p_value == pytest.approx(stats.binomtest(8, 10).pvalue)
+    exact = stats.binomtest(8, 10).pvalue
+    assert c.p_value == pytest.approx(exact - stats.binom.pmf(2, 10, 0.5))  # mid-p
     assert c.spread == pytest.approx(10 / 40)
     assert c.ci[0] < c.difference < c.ci[1]
 
@@ -84,8 +85,17 @@ def _paired_binary(rng, n=40, p=0.7, disc=0.2, d=0.0):
 )
 def test_type_i_error_and_coverage(draw, paired):
     type1, coverage = _rates(np.random.default_rng(2), 2000, draw=draw, paired=paired)
-    assert type1 <= 0.065  # MC SE ~0.005; exact McNemar is conservative
+    assert type1 == pytest.approx(0.05, abs=0.015)  # MC SE ~0.005
     assert coverage == pytest.approx(0.95, abs=0.02)
+
+
+def test_planned_power_is_reached():
+    from llm_judge_stats import n_for_proportions
+
+    rng = np.random.default_rng(4)
+    n = n_for_proportions(0.7, 0.8, discordance=0.2)
+    hits = [compare(*_paired_binary(rng, n, d=0.1)[:2]).p_value < 0.05 for _ in range(1500)]
+    assert np.mean(hits) == pytest.approx(0.8, abs=0.03)
 
 
 def test_compare_many_adjusts_and_names():
