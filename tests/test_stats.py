@@ -96,3 +96,18 @@ def test_majority_vote():
     assert majority_vote(["a", "b", "a"]) == "a"
     assert majority_vote(["a", "b", None]) is None
     assert majority_vote([None], tie="tie") == "tie"
+
+
+def test_bca_matches_scipy():
+    from scipy import stats
+
+    x = np.random.default_rng(0).exponential(size=30)  # skewed: BCa and percentile differ
+    ours = bootstrap_ci(np.mean, x, method="bca", n_boot=20000, seed=1)
+    ref = stats.bootstrap((x,), np.mean, method="BCa", n_resamples=20000, random_state=2)
+    assert ours[1:] == pytest.approx(
+        (ref.confidence_interval.low, ref.confidence_interval.high), rel=0.03
+    )
+    pct = bootstrap_ci(np.mean, x, n_boot=20000, seed=1)
+    assert ours[2] > pct[2]  # right skew pushes the BCa upper bound up
+    with pytest.raises(ValueError):
+        bootstrap_ci(np.mean, x, method="basic")

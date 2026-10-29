@@ -43,17 +43,37 @@ def bootstrap_ci(
     *data: ArrayLike,
     n_boot: int = 2000,
     alpha: float = 0.05,
+    method: str = "percentile",
     strata: ArrayLike | None = None,
     seed: int | np.random.Generator | None = None,
 ) -> tuple[float, float, float]:
-    """Percentile bootstrap over items: returns (estimate, lo, hi).
+    """Bootstrap CI over items: returns (estimate, lo, hi).
 
     `data` arrays are resampled together along axis 0 (rows = items).
     `strata` (e.g. the gold label) resamples within each group, keeping class
     balance fixed - use it for F1/MCC on imbalanced data.
     Resamples where the statistic is undefined (NaN) are dropped.
+
+    method="percentile" is the plain percentile interval. method="bca"
+    (Efron 1987) corrects for bias and skew - prefer it when the estimate sits
+    near a bound (kappa or F1 near 1) or n is small. It costs n extra
+    evaluations of `stat` for the jackknife.
     """
-    # ponytail: percentile CI; switch to BCa if estimates sit near +-1 and skew matters
     arrays, boots = _boot(stat, data, n_boot, strata, seed)
-    lo, hi = np.nanpercentile(boots, [50 * alpha, 100 - 50 * alpha])
-    return float(stat(*arrays)), float(lo), float(hi)
+    est = float(stat(*arrays))
+    q = np.array([alpha / 2, 1 - alpha / 2])
+    if method == "bca":
+        nd = NormalDist()
+        b = boots[~np.isnan(boots)]
+        share = np.mean(b < est) + 0.5 * np.mean(b == est)
+        z0 = nd.inv_cdf(min(max(share, 0.5 / len(b)), 1 - 0.5 / len(b)))
+        n = len(arrays[0])
+        jack = np.array([stat(*(np.delete(d, i, axis=0) for d in arrays)) for i in range(n)])
+        u = np.nanmean(jack) - jack[~np.isnan(jack)]
+        denom = 6 * (u**2).sum() ** 1.5
+        acc = (u**3).sum() / denom if denom > 0 else 0.0
+        q = np.array([nd.cdf(z0 + (z0 + z) / (1 - acc * (z0 + z))) for z in map(nd.inv_cdf, q)])
+    elif method != "percentile":
+        raise ValueError("method must be 'percentile' or 'bca'")
+    lo, hi = np.nanpercentile(boots, 100 * q)
+    return est, float(lo), float(hi)
