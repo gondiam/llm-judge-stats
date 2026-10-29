@@ -1,4 +1,5 @@
 """Statistical tools for evaluating LLM judges against humans (or each other)."""
+
 import math
 from collections import Counter
 from statistics import NormalDist
@@ -6,9 +7,16 @@ from statistics import NormalDist
 import numpy as np
 
 __all__ = [
-    "cohen_kappa", "fleiss_kappa", "icc", "f1", "mcc",
-    "bootstrap_ci", "n_for_kappa", "n_for_precision",
-    "shuffled_judge", "majority_vote",
+    "cohen_kappa",
+    "fleiss_kappa",
+    "icc",
+    "f1",
+    "mcc",
+    "bootstrap_ci",
+    "n_for_kappa",
+    "n_for_precision",
+    "shuffled_judge",
+    "majority_vote",
 ]
 __version__ = "0.1.0"
 
@@ -18,6 +26,7 @@ def _z(alpha):
 
 
 # --- agreement -------------------------------------------------------------
+
 
 def cohen_kappa(a, b):
     """Cohen's kappa between two raters' labels (any hashable categories)."""
@@ -36,7 +45,7 @@ def fleiss_kappa(ratings):
         raise ValueError("ratings must be (n_items, n_raters) with n_raters >= 2")
     n, m = r.shape
     counts = (r[:, :, None] == np.unique(r)).sum(1)  # (n_items, n_categories)
-    p_item = ((counts ** 2).sum(1) - m) / (m * (m - 1))
+    p_item = ((counts**2).sum(1) - m) / (m * (m - 1))
     pe = ((counts.sum(0) / (n * m)) ** 2).sum()
     return float((p_item.mean() - pe) / (1 - pe)) if pe < 1 else math.nan
 
@@ -68,6 +77,7 @@ def icc(scores, kind="2,1"):
 
 # --- classification vs. gold ---------------------------------------------
 
+
 def _confusion(y_true, y_pred, positive):
     t, p = np.asarray(y_true) == positive, np.asarray(y_pred) == positive
     return [float(v) for v in ((t & p).sum(), (~t & p).sum(), (t & ~p).sum(), (~t & ~p).sum())]
@@ -88,6 +98,7 @@ def mcc(y_true, y_pred, positive=1):
 
 
 # --- uncertainty and sample size ------------------------------------------
+
 
 def _boot(stat, data, n_boot, strata, seed):
     data = [np.asarray(d) for d in data]
@@ -146,6 +157,7 @@ def n_for_precision(stat, *pilot, half_width, alpha=0.05, n_boot=2000, strata=No
 
 
 # --- running judges -------------------------------------------------------
+
 
 def shuffled_judge(judge, options, rng=None):
     """Show `options` to `judge` in random order to neutralise position bias.

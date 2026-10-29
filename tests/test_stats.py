@@ -4,8 +4,16 @@ import numpy as np
 import pytest
 
 from llm_judge_stats import (
-    bootstrap_ci, cohen_kappa, f1, fleiss_kappa, icc, majority_vote, mcc,
-    n_for_kappa, n_for_precision, shuffled_judge,
+    bootstrap_ci,
+    cohen_kappa,
+    f1,
+    fleiss_kappa,
+    icc,
+    majority_vote,
+    mcc,
+    n_for_kappa,
+    n_for_precision,
+    shuffled_judge,
 )
 
 
@@ -16,9 +24,18 @@ def test_cohen_kappa():
 
 
 def test_fleiss_kappa_wikipedia_example():
-    counts = [[0, 0, 0, 0, 14], [0, 2, 6, 4, 2], [0, 0, 3, 5, 6], [0, 3, 9, 2, 0],
-              [2, 2, 8, 1, 1], [7, 7, 0, 0, 0], [3, 2, 6, 3, 0], [2, 5, 3, 2, 2],
-              [6, 5, 2, 1, 0], [0, 2, 2, 3, 7]]
+    counts = [
+        [0, 0, 0, 0, 14],
+        [0, 2, 6, 4, 2],
+        [0, 0, 3, 5, 6],
+        [0, 3, 9, 2, 0],
+        [2, 2, 8, 1, 1],
+        [7, 7, 0, 0, 0],
+        [3, 2, 6, 3, 0],
+        [2, 5, 3, 2, 2],
+        [6, 5, 2, 1, 0],
+        [0, 2, 2, 3, 7],
+    ]
     labels = [np.repeat(np.arange(5), row) for row in counts]  # 14 raters per item
     assert fleiss_kappa(labels) == pytest.approx(0.210, abs=1e-3)
 

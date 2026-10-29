@@ -5,12 +5,31 @@ build-backend = "hatchling.build"
 [project]
 name = "llm-judge-stats"
 version = "0.1.0"
-description = "Statistically rigorous evaluation of LLM judges: kappa, ICC, F1/MCC with bootstrap CIs, sample-size planning, position-bias shuffling."
+description = "Statistics for LLM evals: sample-size planning, paired comparisons with CIs and effect sizes, multiple-comparison corrections, judge agreement and judge-error-adjusted metrics."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
-dependencies = ["numpy>=1.22"]
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.24", "scipy>=1.11"]
 
 [project.optional-dependencies]
 example = ["pandas", "pyarrow"]
-test = ["pytest"]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E731"]
+
+[tool.mypy]
+strict = true
+files = ["llm_judge_stats"]
+
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true

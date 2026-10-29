@@ -3,14 +3,24 @@
 Data: https://huggingface.co/datasets/lmsys/mt_bench_human_judgments
 Run:  pip install "llm-judge-stats[example]" && python examples/mt_bench.py
 """
+
 import pandas as pd
 
 from llm_judge_stats import (
-    bootstrap_ci, cohen_kappa, f1, fleiss_kappa, majority_vote, mcc, n_for_kappa, n_for_precision,
+    bootstrap_ci,
+    cohen_kappa,
+    f1,
+    fleiss_kappa,
+    majority_vote,
+    mcc,
+    n_for_kappa,
+    n_for_precision,
 )
 
-URL = ("https://huggingface.co/datasets/lmsys/mt_bench_human_judgments/resolve/"
-       "refs%2Fconvert%2Fparquet/default/{}/0000.parquet")
+URL = (
+    "https://huggingface.co/datasets/lmsys/mt_bench_human_judgments/resolve/"
+    "refs%2Fconvert%2Fparquet/default/{}/0000.parquet"
+)
 KEY = ["question_id", "model_a", "model_b", "turn"]
 cols = KEY + ["winner", "judge"]
 human = pd.read_parquet(URL.format("human"), columns=cols)
@@ -42,7 +52,11 @@ for name, fn in [("F1", f1), ("MCC", mcc)]:
     print(f"{name} (model_a wins, {len(dec)} decisive items): {est:.3f} [{lo:.3f}, {hi:.3f}]")
 
 # How many items to label for +-0.05 on kappa?
-print("items for kappa +-0.05, from this pilot:",
-      n_for_precision(cohen_kappa, df.winner, df.human, half_width=0.05, seed=0))
-print("items for binary kappa=0.6, prevalence=0.3, +-0.05 (planning formula):",
-      n_for_kappa(0.6, 0.3, 0.05))
+print(
+    "items for kappa +-0.05, from this pilot:",
+    n_for_precision(cohen_kappa, df.winner, df.human, half_width=0.05, seed=0),
+)
+print(
+    "items for binary kappa=0.6, prevalence=0.3, +-0.05 (planning formula):",
+    n_for_kappa(0.6, 0.3, 0.05),
+)
