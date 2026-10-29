@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llm-judge-stats"
-version = "0.1.0"
+version = "0.2.0"
 description = "Statistics for LLM evals: sample-size planning, paired comparisons with CIs and effect sizes, multiple-comparison corrections, judge agreement and judge-error-adjusted metrics."
 readme = "README.md"
 license = "MIT"

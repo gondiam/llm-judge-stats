@@ -46,4 +46,4 @@ __all__ = [
     "shuffled_judge",
     "majority_vote",
 ]
-__version__ = "0.1.0"
+__version__ = "0.2.0"
