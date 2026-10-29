@@ -50,10 +50,13 @@ def n_for_precision(
 def _check_paired(p_a: float, p_b: float, discordance: float) -> None:
     # discordance = share of items where exactly one variant passes. With pass
     # rates p_a, p_b that fixes the 2x2 table, which must exist.
-    d = p_b - p_a
+    d, eps = p_b - p_a, 1e-9  # eps: pass rates computed as means carry float error
     b_only, a_only = (discordance + d) / 2, (discordance - d) / 2
     if not (
-        abs(d) <= discordance <= 1 and b_only <= min(p_b, 1 - p_a) and a_only <= min(p_a, 1 - p_b)
+        abs(d) <= discordance + eps
+        and discordance <= 1
+        and b_only <= min(p_b, 1 - p_a) + eps
+        and a_only <= min(p_a, 1 - p_b) + eps
     ):
         raise ValueError(
             f"discordance={discordance} is impossible with pass rates {p_a} and {p_b}: "
@@ -70,7 +73,7 @@ def _power_proportions(
         s0 = math.sqrt(2 * pbar * (1 - pbar))
         s1 = math.sqrt(p_a * (1 - p_a) + p_b * (1 - p_b))
     else:  # McNemar, n paired items (Connor 1987)
-        s0, s1 = math.sqrt(discordance), math.sqrt(discordance - d**2)
+        s0, s1 = math.sqrt(discordance), math.sqrt(max(discordance - d**2, 0))
     num = d * math.sqrt(n) - _z(alpha) * s0
     return _PHI.cdf(num / s1) if s1 > 0 else float(num > 0)
 
@@ -103,7 +106,7 @@ def n_for_proportions(
         s1 = math.sqrt(p_a * (1 - p_a) + p_b * (1 - p_b))
     else:
         _check_paired(p_a, p_b, discordance)
-        s0, s1 = math.sqrt(discordance), math.sqrt(discordance - d**2)
+        s0, s1 = math.sqrt(discordance), math.sqrt(max(discordance - d**2, 0))
     return math.ceil(((z * s0 + zb * s1) / d) ** 2)
 
 
@@ -145,20 +148,23 @@ def smallest_detectable_difference(
     power: float = 0.8,
     alpha: float = 0.05,
 ) -> float | NDArray[np.float64]:
-    """The smallest difference that `n` items detect with the given power.
+    """The smallest difference that `n` items detect with the given power, either direction.
 
     The question to ask of an eval set you already have. Pass an array of n to
     get a detectability curve. Two cases, pick one:
 
     - pass rates: give `p_base` (the current pass rate). The answer is the
-      improvement over it. Paired when `discordance` is given (assumed constant
-      across differences, see `n_for_proportions`); n is per variant otherwise.
+      smallest rise or drop from it that is detectable. Paired when
+      `discordance` is given (assumed constant across differences, see
+      `n_for_proportions`); n is per variant otherwise.
     - mean scores: give `sd`, with `paired` as in `n_for_means`.
 
     NaN where nothing in the possible range is detectable.
     """
     if (p_base is None) == (sd is None):
         raise ValueError("give exactly one of p_base (pass rates) or sd (mean scores)")
+    if discordance is not None and not 0 < discordance <= 1:
+        raise ValueError("discordance must be in (0, 1]")
 
     def one(m: float) -> float:
         if sd is not None:
@@ -171,13 +177,18 @@ def smallest_detectable_difference(
                 hi *= 2
             return float(optimize.brentq(gap, 1e-12 * sd, hi))
         assert p_base is not None
-        hi = 1 - p_base
+        # power is symmetric under swapping pass/fail, so a drop from p_base is
+        # a rise from 1 - p_base; take whichever direction detects less
+        both = [d for d in (up(m, p_base), up(m, 1 - p_base)) if not math.isnan(d)]
+        return min(both, default=math.nan)
+
+    def up(m: float, p0: float) -> float:
+        hi = 1 - p0
         if discordance is not None:
-            _check_paired(p_base, p_base, discordance)
-            hi = min(hi, discordance, 2 * (1 - p_base) - discordance)
+            hi = min(hi, discordance, 2 * (1 - p0) - discordance)
 
         def gap_p(d: float) -> float:
-            return _power_proportions(p_base, p_base + d, m, alpha, discordance) - power
+            return _power_proportions(p0, p0 + d, m, alpha, discordance) - power
 
         if hi <= 0 or gap_p(hi) < 0:
             return math.nan

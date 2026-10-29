@@ -1,6 +1,7 @@
 """Statistical tools for LLM evals: planning, comparing variants and checking judges."""
 
 from .agreement import cohen_kappa, f1, fleiss_kappa, icc, majority_vote, mcc, shuffled_judge
+from .compare import Comparison, adjust_pvalues, compare, compare_many
 from .planning import (
     n_for_kappa,
     n_for_means,
@@ -11,6 +12,10 @@ from .planning import (
 from .resampling import bootstrap_ci
 
 __all__ = [
+    "compare",
+    "compare_many",
+    "Comparison",
+    "adjust_pvalues",
     "cohen_kappa",
     "fleiss_kappa",
     "icc",
