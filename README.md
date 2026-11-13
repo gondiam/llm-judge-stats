@@ -150,34 +150,56 @@ Uses the public [lmsys/mt_bench_human_judgments](https://huggingface.co/datasets
 
 ```
 GPT-4 position-inconsistent verdicts: 15.8%
-items judged by both: 1232
-Cohen's kappa GPT-4 vs human majority: 0.410 [95% CI 0.366, 0.454]
-Fleiss' kappa human-human (761 items): 0.497 [0.446, 0.548]
-F1 (model_a wins, 757 decisive items): 0.529 [0.444, 0.609]
-MCC (model_a wins, 757 decisive items): 0.491 [0.404, 0.577]
-items for kappa +-0.05, from this pilot: 936
+items judged by both: 1814
+raw agreement GPT-4 vs human majority: 67.2%
+Cohen's kappa GPT-4 vs human majority: 0.505 [95% CI 0.472, 0.537]
+  same items, pairs in the order GPT-4 saw them: 0.380 [0.341, 0.419]
+Fleiss' kappa human-human (961 items): 0.503 [0.458, 0.549]
+F1 (model_a wins, 1078 decisive items): 0.891 [0.872, 0.909]
+MCC (model_a wins, 1078 decisive items): 0.767 [0.725, 0.804]
+items for kappa +-0.05, from this pilot: 753
 items for binary kappa=0.6, prevalence=0.3, +-0.05 (planning formula): 1181
-Krippendorff's alpha human-human, all votes (761 items, up to 5 raters): 0.478 [0.437, 0.523]
+Krippendorff's alpha human-human, all votes (961 items, up to 7 raters): 0.485 [0.444, 0.524]
 ```
 
-Correcting a judge-measured rate. On the 757 decisive items, a random half
-plays the human-labelled calibration set, and on the other half only GPT-4's
-verdict is used. The human answer for that half is known, so we can check
-whether the correction lands on it:
+GPT-4 agrees with the human majority about as much as two humans agree with
+each other (kappa 0.505 against 0.503).
+
+**Kappa depends on how the labels are laid out.** The verdicts are `model_a`,
+`model_b` or `tie`, and which model is called `model_a` is arbitrary. With pairs
+in alphabetical order the labels are balanced. In the order GPT-4 saw them,
+`model_b` is usually the stronger model, the labels are unbalanced, and kappa
+falls from 0.505 to 0.380 on the same items with the same 67.2% raw agreement.
+Compare two kappas only when both use the same layout.
+
+Versions up to 0.2.0 of this example reported kappa = 0.410 on 1,232 items. They
+matched human and GPT-4 rows without putting the pairs in one order first, which
+dropped a third of the items and left the rest in GPT-4's order. That figure was
+then set against a human-human kappa computed on balanced labels, which is not a
+like-for-like comparison.
+
+Correcting a judge-measured rate. This part uses the order GPT-4 saw the pairs,
+where `model_a` rarely wins and GPT-4 misses many of those wins. On the 1,078
+decisive items, a random half plays the human-labelled calibration set, and on
+the other half only GPT-4's verdict is used. The human answer for that half is
+known, so we can check whether the correction lands on it:
 
 ```
-Judge pass rate: 10.0% (95% CI 7.0% to 13.0%), 400 items.
-Judge vs. human on 357 calibration items: sensitivity 0.46, specificity 0.98.
-Adjusted pass rate: 18.3% (95% CI 10.4% to 29.8%).
-CI width: 6.0 points if the judge were perfect, 13.7 after correcting for its error rates, 19.3 also counting the uncertainty in those rates (3.2x).
-human rate on the GPT-4-only half (the target): 19.0%
+Judge pass rate: 9.1% (95% CI 6.7% to 11.4%), 563 items.
+Judge vs. human on 515 calibration items: sensitivity 0.47, specificity 0.98.
+Adjusted pass rate: 15.8% (95% CI 9.3% to 23.9%).
+CI width: 4.6 points if the judge were perfect, 10.1 after correcting for its error rates, 14.6 also counting the uncertainty in those rates (3.2x).
+human rate on the GPT-4-only half (the target): 16.2%
 ```
 
 GPT-4 misses more than half of the human "model_a wins" verdicts, so its raw
-rate (10.0%) is far from the human one (19.0%), and its 95% CI excludes it.
+rate (9.1%) is far from the human one (16.2%), and its 95% CI excludes it.
 The corrected rate covers the human value, but the honest interval is 3.2 times
 wider than the naive one. That is what this judge costs. This is one split of
 one dataset. The simulations below check that the CI coverage holds in general.
+
+With only 20 to 50 calibration labels this correction is unreliable. See
+[bayesian-judge-calibration](https://github.com/gondiam/bayesian-judge-calibration).
 
 ## Does it do what it promises?
 
