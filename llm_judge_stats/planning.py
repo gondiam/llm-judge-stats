@@ -197,3 +197,27 @@ def smallest_detectable_difference(
     ns = np.asarray(n, float)
     out = np.array([one(m) for m in ns.ravel()]).reshape(ns.shape)
     return float(out) if out.ndim == 0 else out
+
+
+def n_for_noninferiority(
+    margin: float,
+    discordance: float,
+    true_diff: float = 0.0,
+    power: float = 0.8,
+    alpha: float = 0.025,
+) -> int:
+    """Paired items needed for `noninferiority` to succeed on pass rates.
+
+    `discordance`: share of items where exactly one variant passes (from a
+    pilot). `true_diff`: the real difference cheap - reference you assume;
+    0 means "truly as good". Assuming the cheap variant is even slightly worse
+    (true_diff < 0) raises n fast, since only margin + true_diff is left to
+    detect. One-sided alpha, normal approximation.
+    """
+    gap = margin + true_diff
+    if margin <= 0 or gap <= 0:
+        raise ValueError("margin must be positive and larger than the assumed loss")
+    if not abs(true_diff) <= discordance <= 1:
+        raise ValueError("discordance must be in [|true_diff|, 1]")
+    z = _PHI.inv_cdf(1 - alpha) + _PHI.inv_cdf(power)
+    return math.ceil(z**2 * (discordance - true_diff**2) / gap**2)

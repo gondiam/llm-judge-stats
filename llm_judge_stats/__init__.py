@@ -13,10 +13,19 @@ from .agreement import (
     shuffled_judge,
     spearman,
 )
-from .compare import Comparison, adjust_pvalues, compare, compare_many
+from .compare import (
+    Comparison,
+    MarginTest,
+    adjust_pvalues,
+    compare,
+    compare_many,
+    equivalence,
+    noninferiority,
+)
 from .planning import (
     n_for_kappa,
     n_for_means,
+    n_for_noninferiority,
     n_for_precision,
     n_for_proportions,
     smallest_detectable_difference,
@@ -28,6 +37,9 @@ __all__ = [
     "compare_many",
     "Comparison",
     "adjust_pvalues",
+    "noninferiority",
+    "equivalence",
+    "MarginTest",
     "cohen_kappa",
     "fleiss_kappa",
     "icc",
@@ -42,8 +54,9 @@ __all__ = [
     "n_for_precision",
     "n_for_proportions",
     "n_for_means",
+    "n_for_noninferiority",
     "smallest_detectable_difference",
     "shuffled_judge",
     "majority_vote",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"

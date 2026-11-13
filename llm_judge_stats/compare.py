@@ -330,3 +330,126 @@ def compare_many(
         )
         for r, pa in zip(res, adj, strict=True)
     ]
+
+
+@dataclass(frozen=True)
+class MarginTest:
+    """Result of `noninferiority` or `equivalence`. `print()` it for the verdict.
+
+    `comparison.ci` is the two-sided (1 - 2 * alpha) CI of b - a that the verdict
+    reads: 95% at the default alpha = 0.025.
+    """
+
+    comparison: Comparison
+    margin: float
+    p_value: float
+    alpha: float
+    kind: str
+
+    @property
+    def shown(self) -> bool:
+        return self.p_value < self.alpha
+
+    @property
+    def verdict(self) -> str:
+        lo, hi = self.comparison.ci
+        if self.kind == "equivalence":
+            return "equivalent" if self.shown else "equivalence not shown"
+        if self.shown:
+            return "non-inferior"
+        return "inferior" if hi < -self.margin else "non-inferiority not shown"
+
+    def __str__(self) -> str:
+        c = self.comparison
+
+        def pts(x: float) -> str:
+            return f"{x * 100:.3g} points" if c.binary else f"{x:.2f}"
+
+        def f(x: float) -> str:
+            return f"{x * 100:+.1f}" if c.binary else f"{x:+.2f}"
+
+        conf = f"{100 * (1 - 2 * self.alpha):g}"
+        lines = [
+            f"{c.label}: {f(c.difference)}{' points' if c.binary else ''}, "
+            f"{conf}% CI {f(c.ci[0])} to {f(c.ci[1])}, margin {pts(self.margin)}.",
+            f"{self.verdict.capitalize()} (one-sided {_fmt_p(self.p_value)}, "
+            f"alpha = {self.alpha}).",
+        ]
+        if self.kind == "equivalence":
+            return "\n".join(lines)
+        if self.shown and c.ci[1] < 0:
+            lines.append(f"{c.name_b} is still lower than {c.name_a}, by less than the margin.")
+        elif not self.shown and c.ci[1] >= -self.margin:
+            lines.append(
+                f"The CI rules out a loss larger than {pts(-c.ci[0])}, "
+                "which is beyond the margin: the eval is too small to decide."
+            )
+        return "\n".join(lines)
+
+
+def _p_above(a: ArrayLike, b: ArrayLike, shift: float, c: Comparison, alpha: float) -> float:
+    """One-sided p-value for H0: mean(b) - mean(a) <= -shift, matching c's CI."""
+    if c.binary:  # Wald on the adjusted estimate, the same one behind the CI
+        se = (c.ci[1] - c.ci[0]) / (2 * _z(2 * alpha))
+        return float(stats.norm.sf(((c.ci[0] + c.ci[1]) / 2 + shift) / se))
+    x, y = np.asarray(a, float), np.asarray(b, float) + shift
+    if c.paired:
+        if (y - x).std() == 0:
+            return float(not (y - x).mean() > 0)
+        return float(stats.ttest_1samp(y - x, 0, alternative="greater").pvalue)
+    return float(stats.ttest_ind(y, x, equal_var=False, alternative="greater").pvalue)
+
+
+def noninferiority(
+    a: ArrayLike,
+    b: ArrayLike,
+    margin: float,
+    *,
+    paired: bool = True,
+    alpha: float = 0.025,
+    binary: bool | None = None,
+    names: tuple[str, str] = ("A", "B"),
+) -> MarginTest:
+    """Is b (the cheaper variant) at most `margin` worse than a (the reference)?
+
+    "No significant difference" does not show this: a small eval finds no
+    difference between anything. Here the burden is reversed. H0 is "b is worse
+    than a by `margin` or more", and b is non-inferior only if the data reject
+    it: the lower limit of the two-sided (1 - 2 * alpha) CI of b - a is above
+    -margin. `margin` is in score units (0.04 = 4 points for pass rates) and
+    must be fixed before seeing the results. Higher scores must mean better.
+
+    Same arguments and same CIs as `compare`. The one-sided p-value comes from
+    the statistic behind the CI, so the two always agree; pass several of them
+    to `adjust_pvalues`. Verdicts: "non-inferior", "non-inferiority not shown"
+    (the CI crosses -margin) or "inferior" (the whole CI is below -margin).
+    """
+    if margin <= 0:
+        raise ValueError("margin must be positive")
+    c = _compare(a, b, paired, 2 * alpha, binary, names)
+    return MarginTest(c, margin, _p_above(a, b, margin, c, alpha), alpha, "non-inferiority")
+
+
+def equivalence(
+    a: ArrayLike,
+    b: ArrayLike,
+    margin: float,
+    *,
+    paired: bool = True,
+    alpha: float = 0.025,
+    binary: bool | None = None,
+    names: tuple[str, str] = ("A", "B"),
+) -> MarginTest:
+    """Is b within +-`margin` of a? Two one-sided tests (TOST).
+
+    Equivalent when the two-sided (1 - 2 * alpha) CI of b - a lies inside
+    (-margin, +margin). The p-value is the larger of the two one-sided ones.
+    Use it when a change should not move the metric either way, such as
+    swapping the judge model.
+    """
+    if margin <= 0:
+        raise ValueError("margin must be positive")
+    c = _compare(a, b, paired, 2 * alpha, binary, names)
+    rev = _compare(b, a, paired, 2 * alpha, binary, names[::-1])
+    p = max(_p_above(a, b, margin, c, alpha), _p_above(b, a, margin, rev, alpha))
+    return MarginTest(c, margin, p, alpha, "equivalence")

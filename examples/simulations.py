@@ -8,7 +8,14 @@ import math
 
 import numpy as np
 
-from llm_judge_stats import bootstrap_ci, compare, judge_adjusted_rate, n_for_proportions
+from llm_judge_stats import (
+    bootstrap_ci,
+    compare,
+    judge_adjusted_rate,
+    n_for_noninferiority,
+    n_for_proportions,
+    noninferiority,
+)
 
 rng = np.random.default_rng(0)
 
@@ -51,6 +58,16 @@ for d in (0.05, 0.10):
     n = n_for_proportions(0.7, 0.7 + d, discordance=0.2)
     hits = [compare(*paired_binary(n, 0.7, 0.2, d)).p_value < 0.05 for _ in range(4000)]
     print(f"  {d * 100:.0f} points, n = {n}: {rate(hits)}")
+
+print("\nnoninferiority(): margin 4 points, discordance 0.20, one-sided alpha = 0.025")
+for n in (100, n_for_noninferiority(0.04, 0.2)):
+    at_margin = [
+        noninferiority(*paired_binary(n, 0.7, 0.2, -0.04), 0.04).shown for _ in range(4000)
+    ]
+    no_diff = [noninferiority(*paired_binary(n, 0.7, 0.2, 0.0), 0.04).shown for _ in range(4000)]
+    print(f"  n = {n}")
+    print(f"    type I error (true loss = margin): {rate(at_margin)}")
+    print(f"    power (no true difference):        {rate(no_diff)}")
 
 print("\nbootstrap_ci(): 95% coverage of the mean of a skewed (exponential) sample, n = 20")
 pct, bca = [], []

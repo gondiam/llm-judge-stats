@@ -82,6 +82,7 @@ smallest_detectable_difference([50, 100, 200, 500, 1000, 2000], p_base=0.70, dis
 | Function | What it does |
 |---|---|
 | `n_for_proportions(p_a, p_b, power=0.8, alpha=0.05, discordance=None)` | Items needed to detect a pass-rate difference. Paired (McNemar, Connor 1987) when `discordance` is given, unpaired (items per variant) otherwise |
+| `n_for_noninferiority(margin, discordance, true_diff=0.0, power=0.8, alpha=0.025)` | Paired items needed for `noninferiority` to succeed on pass rates. Assuming the cheap variant is even 1 point worse raises n fast |
 | `n_for_means(delta, sd, power=0.8, alpha=0.05, paired=True)` | Same for continuous judge scores, exact via the noncentral t. For paired data `sd` is the SD of per-item differences |
 | `smallest_detectable_difference(n, ...)` | The inverse: the smallest difference a given N detects, in either direction. Accepts an array of N for a detectability curve |
 | `n_for_kappa(kappa, prevalence, half_width)` | Items to label so a binary kappa's CI has a target width (Bloch & Kraemer 1989) |
@@ -93,6 +94,8 @@ smallest_detectable_difference([50, 100, 200, 500, 1000, 2000], p_base=0.70, dis
 |---|---|
 | `compare(a, b, paired=True, alpha=0.05, min_relevant=None)` | Difference, CI, p-value and effect size for two variants. Paired: mid-p McNemar + Agresti-Min CI for 0/1 data, paired t otherwise. Unpaired: two-proportion z + Agresti-Caffo CI, or Welch t. Returns a `Comparison`; `print()` gives the verdict |
 | `compare_many(scores, baseline, correction="holm")` | k variants against a baseline, p-values adjusted by Holm (FWER) or Benjamini-Hochberg (FDR) |
+| `noninferiority(a, b, margin, paired=True, alpha=0.025)` | Is the cheaper variant b at most `margin` worse than a? Non-inferior only if the lower limit of the 95% CI of b - a is above -margin. Verdicts: non-inferior, not shown, inferior |
+| `equivalence(a, b, margin, paired=True, alpha=0.025)` | Is b within +-margin of a? Two one-sided tests (TOST) on the same CI |
 | `adjust_pvalues(p, method="holm")` | Holm or Benjamini-Hochberg adjustment on its own |
 | `bootstrap_ci(stat, *data, method="percentile", strata=None)` | Bootstrap CI over items for any metric; `method="bca"` for skewed statistics |
 
@@ -110,6 +113,20 @@ from llm_judge_stats import compare_many
 
 results = compare_many({"base": base, "v1": v1, "v2": v2, "v3": v3}, baseline="base")
 print(*results, sep="\n\n")
+```
+
+"No significant difference" is not evidence that a cheaper model is as good: a
+small eval finds no difference between anything. `noninferiority` reverses the
+burden of proof, as clinical trials do (ICH E9, E10). The margin is fixed
+before the eval runs:
+
+```python
+from llm_judge_stats import noninferiority
+
+print(noninferiority(large, small, margin=0.04, names=("large", "small")))
+# small vs large: -4.0 points, 95% CI -9.5 to +1.6, margin 4 points.
+# Non-inferiority not shown (one-sided p = 0.494, alpha = 0.025).
+# The CI rules out a loss larger than 9.51 points, which is beyond the margin: the eval is too small to decide.
 ```
 
 ### 3. Judge quality
@@ -224,6 +241,12 @@ discordance 20%, target 0.80), `compare()` rejects in 0.793 (SE 0.006) of runs
 for a 5-point difference (n = 626) and 0.797 (SE 0.006) for 10 points (n = 155).
 An earlier version used the exact McNemar test. It reached only about 0.75
 power and a 0.018 type I error, so it was replaced by mid-p.
+
+**`noninferiority()`** (margin 4 points, discordance 20%, base 70%, 4000 runs):
+when the true loss equals the margin it wrongly declares non-inferiority in
+0.025 (SE 0.002) of runs, the nominal one-sided alpha, at n = 100 and at
+n = 982. With no true difference it succeeds in 0.803 (SE 0.006) of runs at the
+n = 982 from `n_for_noninferiority`, and in 0.143 (SE 0.006) at n = 100.
 
 **Bootstrap on a skewed statistic** (mean of 20 exponential draws, 1000 runs):
 percentile coverage 0.892 (SE 0.010), BCa 0.912 (SE 0.009). BCa helps but

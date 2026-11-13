@@ -108,3 +108,36 @@ def test_compare_many_adjusts_and_names():
     assert "v2 is higher" in str(res[1]) and "Holm-adjusted" in str(res[1])
     with pytest.raises(ValueError):
         compare_many(scores, "missing")
+
+
+def test_noninferiority_agrees_with_ci_and_names_the_verdict():
+    from llm_judge_stats import equivalence, n_for_noninferiority, noninferiority
+
+    rng = np.random.default_rng(1)
+    a = rng.random(2000) < 0.5
+    same = np.where(rng.random(2000) < 0.9, a, ~a)  # 10% discordant, no real difference
+    worse = a & (rng.random(2000) < 0.8)  # about 10 points lower
+    r = noninferiority(a, same, 0.04)
+    assert r.verdict == "non-inferior" and r.shown and r.comparison.ci[0] > -0.04
+    assert r.comparison.ci == pytest.approx(compare(a, same).ci)  # the same 95% CI
+    assert equivalence(a, same, 0.04).verdict == "equivalent"
+    assert noninferiority(a, worse, 0.04).verdict == "inferior"
+    small = noninferiority(a[:60], same[:60], 0.04)
+    assert small.verdict == "non-inferiority not shown" and "too small" in str(small)
+    # p < alpha exactly when the CI clears the margin, binary and continuous, both designs
+    x = rng.normal(5, 1, 200)
+    for u, v, paired in [
+        (a, same, True),
+        (a, same, False),
+        (x, x + rng.normal(0, 1, 200), True),
+        (x, rng.normal(5, 1, 200), False),
+    ]:
+        for m in (0.01, 0.03, 0.1, 0.3):
+            t = noninferiority(u, v, m, paired=paired)
+            assert t.shown == (t.comparison.ci[0] > -m)
+            e = equivalence(u, v, m, paired=paired)
+            assert e.shown == (-m < e.comparison.ci[0] and e.comparison.ci[1] < m)
+    assert n_for_noninferiority(0.04, 0.2) == 982  # 7.85 * 0.2 / 0.04^2
+    assert n_for_noninferiority(0.04, 0.2, true_diff=-0.01) > 1700
+    with pytest.raises(ValueError):
+        n_for_noninferiority(0.04, 0.2, true_diff=-0.04)
